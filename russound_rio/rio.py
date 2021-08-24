@@ -20,6 +20,11 @@ class CommandException(Exception):
     pass
 
 
+class EmptyResponseException(Exception):
+    """ A empty response was received from the controller. """
+    pass
+
+
 class UncachedVariable(Exception):
     """ A variable was not found in the cache. """
     pass
@@ -132,6 +137,10 @@ class Russound:
 
     def _process_response(self, res):
         s = str(res, 'utf-8').strip()
+        if not s:
+            logger.debug("Device responded with a empty message %s", s)
+            raise EmptyResponseException(s)
+
         ty, payload = s[0], s[2:]
         if ty == 'E':
             logger.debug("Device responded with error: %s", payload)
@@ -174,6 +183,8 @@ class Russound:
                         self._process_response(response)
                     except CommandException:
                         pass
+                    except EmptyResponseException:
+                        pass
                     net_future = ensure_future(
                             reader.readline(), loop=self._loop)
 
@@ -196,6 +207,9 @@ class Russound:
                                 future.set_result(value)
                                 break
                         except CommandException as e:
+                            future.set_exception(e)
+                            break
+                        except EmptyResponseException as e:
                             future.set_exception(e)
                             break
             logger.debug("IO loop exited")
